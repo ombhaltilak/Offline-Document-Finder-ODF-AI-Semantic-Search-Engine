@@ -1,54 +1,89 @@
 """
-Vector Search Engine
-Handles ChromaDB-based similarity search for document retrieval.
+Vector Search Engine (LanceDB + GPU Support)
+Handles high-performance, disk-based similarity search using LanceDB.
+Automatically selects GPU (CUDA) if available, otherwise falls back to CPU.
 """
 
-import chromadb
-from chromadb.config import Settings
+import lancedb
 import os
-import uuid
 import time
-from tqdm import tqdm
-from search_engine.embedder import Embedder
+import importlib.util
+from fastembed import TextEmbedding
+
+# --- CONFIGURATION ---
+# State-of-the-Art local model.
+MODEL_NAME = "mixedbread-ai/mxbai-embed-large-v1" 
 
 class VectorSearch:
     def __init__(self):
-        """Initialize the vector search engine with ChromaDB."""
-        self.embedder = Embedder()
+        """Initialize the vector search engine with LanceDB and auto-GPU detection."""
         
-        # Initialize ChromaDB persistent client
-        # Persistence Logic:
-        # If frozen (exe), store data next to the executable file.
-        # If script, store in project root.
+        # 1. Initialize Embedder with Smart Device Detection
+        print(f"Loading embedding model: {MODEL_NAME}...")
+        
+        # Default to CPU
+        providers = ["CPUExecutionProvider"]
+        device_label = "CPU"
+
+        # Check for NVIDIA GPU (CUDA) support via ONNX Runtime
+        try:
+            import onnxruntime as ort
+            available_providers = ort.get_available_providers()
+            if "CUDAExecutionProvider" in available_providers:
+                providers = ["CUDAExecutionProvider"]
+                device_label = "GPU (NVIDIA CUDA)"
+        except ImportError:
+            pass # onnxruntime not installed, standard CPU fallback
+
+        print(f"Targeting Hardware: {device_label}")
+
+        try:
+            # Initialize FastEmbed with the selected provider
+            self.model = TextEmbedding(
+                model_name=MODEL_NAME,
+                providers=providers
+            )
+            self.embedder = self.model
+            print(f"Model '{MODEL_NAME}' loaded successfully on {device_label}!")
+            
+        except Exception as e:
+            print(f"Error loading model {MODEL_NAME} on {device_label}: {e}")
+            print("Falling back to default BGE-Small on CPU...")
+            try:
+                self.model = TextEmbedding("BAAI/bge-small-en-v1.5", providers=["CPUExecutionProvider"])
+                self.embedder = self.model
+            except Exception as fallback_error:
+                print(f"Critical error loading fallback model: {fallback_error}")
+
+        # 2. Setup Database Path
+        # Logic: If running as .exe, store next to it. If script, store in project root.
         import sys
         if getattr(sys, 'frozen', False):
             base_dir = os.path.dirname(sys.executable)
         else:
-            base_dir = os.path.join(os.path.dirname(__file__), '..')
+            base_dir = os.path.join(os.path.dirname(__file__), '..', '..')
             
-        self.db_path = os.path.join(base_dir, 'data', 'chroma_db')
-            
+        self.db_path = os.path.join(base_dir, 'data', 'lancedb')
+        
         if not os.path.exists(self.db_path):
             os.makedirs(self.db_path)
-            
-        self.client = chromadb.PersistentClient(path=self.db_path)
+
+        # 3. Connect to LanceDB
+        self.db = lancedb.connect(self.db_path)
         
-        # Get or create collection
-        self.collection = self.client.get_or_create_collection(
-            name="documents",
-            metadata={"hnsw:space": "cosine"} # Use cosine similarity
-        )
+        # 4. Open or Create Table
+        self.table_name = "documents"
+        self.table = None
         
-        print(f"VectorSearch initialized with ChromaDB at {self.db_path}")
+        if self.table_name in self.db.table_names():
+            self.table = self.db.open_table(self.table_name)
+            print(f"Connected to existing LanceDB table at {self.db_path}")
+        else:
+            print(f"LanceDB initialized at {self.db_path} (Table will be created on first index)")
 
     def _recursive_text_split(self, text, chunk_size=1000, chunk_overlap=100):
-        """
-        Split text into chunks recursively (similar to LangChain).
-        Simple implementation: split by paragraphs, then sentences, then chars.
-        """
-        if not text:
-            return []
-            
+        """Split text with a safety valve to prevent infinite loops on long strings."""
+        if not text: return []
         chunks = []
         start = 0
         text_len = len(text)
@@ -58,174 +93,163 @@ class VectorSearch:
             if end >= text_len:
                 chunks.append(text[start:])
                 break
-                
-            # Try to find a good breaking point (newline, period, space)
-            # Look back from 'end' to find a separator
+            
+            # Find a natural break point
             break_point = -1
             for sep in ['\n\n', '\n', '. ', ' ']:
                 idx = text.rfind(sep, start, end)
-                if idx != -1 and idx > start + (chunk_size // 2): # Ensure we don't split too early
+                if idx != -1 and idx > start + (chunk_size // 2):
                     break_point = idx + len(sep)
                     break
             
             if break_point != -1:
                 chunks.append(text[start:break_point])
-                start = break_point - chunk_overlap # Overlap
+                start = break_point - chunk_overlap 
             else:
-                # Force split
+                # --- SAFETY FIX: Force split if no natural separator found ---
+                # This handles massive hex dumps or code strings without spaces
                 chunks.append(text[start:end])
                 start = end - chunk_overlap
-                
+        
         return chunks
     
-    def add_documents(self, documents_generator, batch_size=100, progress_callback=None):
-        """
-        Add documents to the ChromaDB collection in batches.
-        
-        Args:
-            documents_generator: Generator yielding dictionaries with 'content', 'metadata', 'id'
-            batch_size (int): Number of documents to add at once
-            progress_callback (func): Optional callback(count, current_doc_name)
-        """
-        batch_ids = []
-        batch_documents = []
-        batch_metadatas = []
-        batch_embeddings = []
-        
+    def add_documents(self, documents_generator, batch_size=16, progress_callback=None):
+        """Add documents to LanceDB with Error Skipping."""
+        batch_data = []
         count = 0
         
         for doc in documents_generator:
-            content = doc['content']
-            base_id = doc['id']
-            metadata = doc['metadata']
-            
-            # Split content into chunks
-            chunks = self._recursive_text_split(content)
-            
-            for i, chunk in enumerate(chunks):
-                chunk_id = f"{base_id}_chunk_{i}"
-                batch_ids.append(chunk_id)
-                batch_documents.append(chunk)
-                # Helper: Add chunk index to metadata for debugging/ordering
-                chunk_meta = metadata.copy()
-                chunk_meta['chunk_index'] = i
-                batch_metadatas.append(chunk_meta)
-            
-            # Check batch size based on *chunks*, not files
-            if len(batch_ids) >= batch_size:
-                self._process_batch(batch_ids, batch_documents, batch_metadatas)
-                batch_ids, batch_documents, batch_metadatas = [], [], []
+            # --- 🛡️ ERROR HANDLING START ---
+            try:
+                content = doc['content']
+                base_id = doc['id']
+                metadata = doc['metadata']
+                file_path = metadata.get('source', 'Unknown File')
+
+                # DEBUG: Print what we are working on (so you know if it hangs)
+                file_path = doc['metadata'].get('source', 'Unknown Path')
+                print(f"Processing: {file_path}")
+
+                chunks = self._recursive_text_split(content)
+                
+                if chunks:
+                    # Embed chunks (Safe Batching)
+                    embeddings = list(self.model.embed(chunks, batch_size=batch_size))
+                
+                    for i, chunk in enumerate(chunks):
+                        chunk_id = f"{base_id}_chunk_{i}"
+                        row = {
+                            "id": chunk_id,
+                            "vector": embeddings[i].tolist(),
+                            "content": chunk,
+                            "filename": metadata.get('filename', ''),
+                            "source": metadata.get('source', ''),
+                            "chunk_index": i,
+                            "created_at": time.time()
+                        }
+                        batch_data.append(row)
+
+            except Exception as e:
+                # 🛑 THIS IS THE SKIP LOGIC
+                print(f"\n⚠️ SKIPPING CORRUPT FILE: {doc.get('metadata', {}).get('source', 'Unknown')}")
+                print(f"   Reason: {e}\n")
+                continue 
+            # --- 🛡️ ERROR HANDLING END ---
+
+            # Process Batch (Write to Database)
+            # We do this OUTSIDE the try/except so valid data from previous files gets saved
+            if len(batch_data) >= batch_size:
+                self._upsert_batch(batch_data)
+                batch_data = []
             
             count += 1
             if progress_callback:
-                progress_callback(count, doc.get('metadata', {}).get('filename', ''))
-            elif count % 100 == 0:
+                progress_callback(count, metadata.get('filename', ''))
+            elif count % 10 == 0:
                 print(f"Processed {count} documents...")
 
         # Process remaining
-        if batch_ids:
-            self._process_batch(batch_ids, batch_documents, batch_metadatas)
+        if batch_data:
+            self._upsert_batch(batch_data)
             
-        print(f"Finished adding {count} documents to index.")
+        print(f"Finished adding {count} documents to LanceDB.")
+    def _upsert_batch(self, data):
+        """Helper to insert/upsert data into LanceDB."""
+        if not data: return
 
-    def _process_batch(self, ids, documents, metadatas):
-        """Helper to embedding and upsert a batch."""
         try:
-            # Check which documents already exist to avoid re-work (Naïve check, Chroma handles upsert but we can save embedding time)
-            # For now, we trust upsert. To optimize, we could check existence first.
-            
-            # Generate embeddings using FastEmbed
-            embeddings = self.embedder.embed_texts(documents)
-            
-            # Upsert to Chroma
-            self.collection.upsert(
-                ids=ids,
-                documents=documents,
-                metadatas=metadatas,
-                embeddings=embeddings.tolist()
-            )
+            if self.table is None and self.table_name not in self.db.table_names():
+                self.table = self.db.create_table(self.table_name, data=data)
+            elif self.table is None:
+                self.table = self.db.open_table(self.table_name)
+                self.table.add(data)
+            else:
+                try:
+                    self.table.merge_insert("id") \
+                        .when_matched_update_all() \
+                        .when_not_matched_insert_all() \
+                        .execute(data)
+                except:
+                    self.table.add(data)
         except Exception as e:
-            print(f"Error processing batch: {e}")
+            print(f"Error writing batch to LanceDB: {e}")
 
     def search(self, query, top_k=10, filter_metadata=None):
-        """
-        Search for documents similar to the query.
-        Implements Hybrid Search: Semantic Vector Search + Exact Keyword Boosting.
-        """
+        """Search LanceDB using Hybrid logic (Vector + Keyword Boost)."""
         try:
-            if self.collection.count() == 0:
+            if self.table is None:
+                if self.table_name in self.db.table_names():
+                    self.table = self.db.open_table(self.table_name)
+                else:
+                    return []
+
+            # 1. Embed Query (Uses GPU if available)
+            query_embedding = list(self.model.embed([query]))[0]
+            
+            # 2. Vector Search
+            candidates = self.table.search(query_embedding) \
+                .metric("cosine") \
+                .limit(top_k * 3) \
+                .to_list()
+            
+            if not candidates:
                 return []
-                
-            query_embedding = self.embedder.embed_text(query)
-            
-            # Hybrid Search Strategy:
-            # 1. Fetch more candidates (3x) from vector search to cast a wider net
-            # 2. Check for exact keyword matches in these candidates
-            # 3. Apply boosting for exact matches
-            # 4. Re-rank and return top_k
-            
-            candidate_k = top_k * 3
-            
-            results = self.collection.query(
-                query_embeddings=[query_embedding.tolist()],
-                n_results=candidate_k,
-                where=filter_metadata
-            )
-            
-            if not results['ids']:
-                return []
-                
-            # Unpack results
-            ids = results['ids'][0]
-            distances = results['distances'][0]
-            metadatas = results['metadatas'][0]
-            documents = results['documents'][0]
-            
-            candidates = []
+
+            # 3. Hybrid Re-ranking
             query_lower = query.lower().strip()
-            
-            for i in range(len(ids)):
-                # Base Semantic Score
-                # Cosine distance is 0 to 2. Similarity = 1 - (distance / 2) roughly
-                base_score = 1 - (distances[i])
+            final_results = []
+
+            for item in candidates:
+                distance = item['_distance']
+                base_score = 1 - distance
+                
+                content_text = item['content']
+                filename = item['filename'].lower()
+                
+                boost_applied = False
                 final_score = base_score
                 
-                content_text = documents[i] or ""
-                metadata = metadatas[i] or {}
-                filename = metadata.get('filename', '').lower()
-                
-                # --- HYBRID BOOSTING LOGIC ---
-                boost_applied = False
-                
-                # 1. Title Match Boost (Very High)
                 if query_lower in filename:
                     final_score += 0.25
                     boost_applied = True
                     
-                # 2. Exact Content Match Boost (Moderate)
                 if query_lower in content_text.lower():
                     final_score += 0.15
                     boost_applied = True
                 
-                # Ensure we don't exceed 1.0 (optional, but good for consistent UI%)
-                final_score = min(1.0, final_score)
+                final_score = min(1.0, max(0.0, final_score))
                 
-                candidates.append({
-                    'id': ids[i],
-                    'similarity': max(0.0, float(final_score)),
-                    'base_score': base_score, # Debugging
-                    'boosted': boost_applied,
+                final_results.append({
+                    'id': item['id'],
+                    'similarity': float(final_score),
                     'content': content_text,
-                    'metadata': metadata,
-                    'file_path': metadata.get('source'),
-                    'filename': metadata.get('filename', 'Unknown'),
+                    'metadata': {'filename': item['filename'], 'source': item['source']},
+                    'file_path': item['source'],
+                    'filename': item['filename']
                 })
-                
-            # Re-rank based on final_score
-            candidates.sort(key=lambda x: x['similarity'], reverse=True)
             
-            # Return top_k
-            return candidates[:top_k]
+            final_results.sort(key=lambda x: x['similarity'], reverse=True)
+            return final_results[:top_k]
             
         except Exception as e:
             print(f"Search error: {e}")
@@ -233,41 +257,39 @@ class VectorSearch:
             
     def get_stats(self):
         """Get database statistics."""
-        return {
-            "count": self.collection.count(),
-            "path": self.db_path
-        }
+        count = 0
+        if self.table_name in self.db.table_names():
+            if self.table is None:
+                self.table = self.db.open_table(self.table_name)
+            count = len(self.table)
+        return {"count": count, "path": self.db_path}
     
     def get_all_ids(self):
         """Get set of all document IDs currently in the index."""
         try:
-            if self.collection.count() == 0:
-                return set()
+            if self.table_name not in self.db.table_names(): return set()
+            if self.table is None: self.table = self.db.open_table(self.table_name)
+                
+            tbl = self.table.search().limit(100000).select(["id"]).to_arrow()
+            all_ids = tbl["id"].to_pylist()
             
-            # ChromaDB get() without args returns all info. We just need IDs.
-            # Depending on DB size, this might be heavy, but IDs are small (MD5).
-            result = self.collection.get(include=[]) # Don't fetch embeddings or documents
-            all_server_ids = result['ids']
-            
-            # Convert server IDs (file_hash_chunk_X) back to file IDs (file_hash)
-            # We just split by '_chunk_' and take the first part
             file_ids = set()
-            for sid in all_server_ids:
+            for sid in all_ids:
                 if '_chunk_' in sid:
                     file_ids.add(sid.split('_chunk_')[0])
                 else:
-                    file_ids.add(sid) # Backwards compatibility
-            
+                    file_ids.add(sid)
             return file_ids
         except Exception as e:
             print(f"Error getting IDs: {e}")
             return set()
 
     def clear(self):
-        """Delete all documents in collection."""
+        """Delete the table."""
         try:
-            self.client.delete_collection("documents")
-            self.collection = self.client.get_or_create_collection(name="documents")
+            if self.table_name in self.db.table_names():
+                self.db.drop_table(self.table_name)
+                self.table = None
             print("Index cleared.")
         except Exception as e:
             print(f"Error clearing index: {e}")
