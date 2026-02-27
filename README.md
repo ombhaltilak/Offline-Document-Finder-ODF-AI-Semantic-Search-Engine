@@ -1,138 +1,252 @@
-# Offline Document Finder (ODF)
+# 🔍 Offline Document Finder (ODF)
 
-**"Search Like You Think"** – A Local-First, AI-Powered Document Search Engine.
+> **Search Like You Think — 100% Offline AI Document Search**
 
-## 🚀 Problem Solved
+Offline Document Finder (ODF) is a local-first, AI-powered desktop application that enables semantic search across your personal documents.
 
-Traditional file search is broken. It relies on **lexical (keyword) matching**, meaning if you name a file `2024_Fiscal_Review.pdf` and search for "Budget Report", you'll find nothing.
-
-ODF solves this by using **Semantic Search**. It reads your documents, understands the *concepts* inside them (via high-dimensional vector embeddings), and lets you search using natural language.
-
-* **User Intent**: "I need the notes from the meeting about the new marketing strategy."
-* **ODF Result**: Finds `Q3_Strategy_v2.docx` (even if the word "marketing" isn't in the filename).
+Instead of relying only on filenames or exact keyword matches, ODF understands the **meaning** of your content using vector embeddings and retrieves results intelligently.
 
 ---
 
-## 🏗️ Architecture
+## 🚀 The Problem ODF Solves
 
-ODF is engineered as a **Native Desktop Overlay** utilizing a "Local-First" AI stack. It is designed to be resource-efficient, leveraging disk-based storage to avoid RAM bottlenecks.
+Traditional file search:
 
-### 1. The Frontend (Presentation Layer)
+- Matches exact words only  
+- Fails when filenames don’t contain your search term  
+- Cannot understand context  
 
-* **Framework**: `CustomTkinter` (Modern UI wrapper).
-* **Design System**:
-* **Floating Overlay**: Borderless window (`overrideredirect=True`) that sits on top (`-topmost`).
-* **Theme**: Ultra-Dark Mode (`#1e1e1e` background) with accessible contrast.
-* **Responsiveness**: Asynchronous UI updates via background threading to prevent freezing.
+ODF:
 
+- Understands semantic meaning  
+- Converts documents into vector embeddings  
+- Uses similarity-based retrieval  
+- Works entirely offline  
 
-* **Global Access**: Background daemon listens for `Ctrl+K` to toggle visibility instantly over any application.
+### Example
 
-### 2. The Engine (Ingestion Layer)
+Search:
 
-* **Parallel Processing**: Uses `ThreadPoolExecutor` to scan directories and read files concurrently.
-* **Incremental Indexing**: Implements **MD5 Hashing** (Path + Modification Time).
-* *Benefit*: If a file hasn't changed, ODF skips re-reading it, making subsequent syncs instant.
+> meeting notes about marketing strategy  
 
+ODF can return:
 
-* **Parsers**:
-* `pdfminer.six` (High-fidelity PDF text extraction).
-* `python-docx` (Word document parsing).
-* Recursive Chunking: Splits text into **1000-character segments** (with 100-char overlap) to preserve context.
+> Q3_Strategy_v2.docx  
 
-
-
-### 3. The "Brain" (AI & Storage)
-
-* **Inference Engine**: `ONNX Runtime` via `FastEmbed`.
-* **Hardware Aware**: Automatically detects NVIDIA GPUs. If found, it switches to `CUDAExecutionProvider` for massive speedups (4x-10x). If not, it falls back to optimized CPU inference.
-
-
-* **Embedding Model**: `Mixedbread AI (mxbai-embed-large-v1)`.
-* **Specs**: 335M parameters, **1024 dimensions**.
-* *Why?* Much deeper semantic understanding than standard 384-dim models.
-
-
-* **Vector Database**: `LanceDB` (Disk-Based Vector Store).
-* **Zero-Copy Access**: Stores vectors on the SSD/HDD using Apache Arrow format, meaning it **does not** load the entire index into RAM. This solves the memory crash issues common with FAISS.
-
-
+—even if the word *“marketing”* does not appear in the filename.
 
 ---
 
-## 🧠 Hybrid Retrieval Logic
+## 🧠 Core Technologies
 
-ODF doesn't just trust the AI blindly. It uses a **Hybrid Ranking Algorithm** to balance conceptual understanding with exact precision.
+ODF combines modern AI tools with a lightweight desktop interface.
 
-### The Workflow:
+### 🔹 ChromaDB (Local Vector Database)
 
-1. **Semantic Retrieval**:
-* The user's query is vectorized (converted to numbers).
-* LanceDB retrieves the **Top-30** conceptually similar candidates using Cosine Similarity.
+Used to store document embeddings persistently.
 
+- Disk-based storage  
+- Fast similarity search  
+- No RAM-heavy in-memory indexing  
 
-2. **Lexical Boosting (Re-Ranking)**:
-* The system scans these 30 candidates for exact keywords.
-* **Filename Match**: Adds **+0.25** to the score (Strong boost).
-* **Content Match**: Adds **+0.15** to the score (Moderate boost).
-
-
-3. **Final Sort**: The list is re-ordered based on the boosted scores, and the **Top-10** are displayed.
-
-**Why?**
-
-* Searching *"Invoice"* (Concept) finds `Billing_Statement.pdf`.
-* Searching *"INV-2024-001"* (Specific ID) forces that exact file to the top, even if the AI thinks another file is "conceptually" similar.
-
----
-
-## 🔒 Privacy & Performance
-
-* **100% Offline**: No data leaves your machine. No API keys required.
-* **Disk-Based Storage**: Unlike in-memory databases that eat RAM, LanceDB keeps the footprint low (~150MB RAM even with thousands of docs).
-* **Hardware Acceleration**: Utilizes NVIDIA CUDA cores for ingestion if available, making indexing significantly faster.
-
----
-
-## 🛠️ Installation & Usage
-
-### Prerequisites
-
-* Python 3.10+
-* (Optional) NVIDIA GPU with CUDA Toolkit installed
-
-### Setup
-
-1. **Clone the Repo**:
-```bash
-git clone https://github.com/yourusername/odf.git
-cd odf
+Embeddings are stored locally in:
 
 ```
+data/chroma_db/
+```
 
+---
 
-2. **Install Dependencies**:
+### 🔹 Semantic Embeddings
+
+- Documents are converted into high-dimensional numeric vectors  
+- User queries are converted into vectors  
+- Similarity scoring retrieves the most relevant results  
+
+---
+
+### 🔹 Desktop UI (Tkinter-Based)
+
+- Lightweight Python GUI  
+- Native desktop window  
+- Minimal system resource usage  
+
+---
+
+### 🔹 Global Hotkey Support
+
+Registered using the `keyboard` Python library.
+
+```
+Ctrl + K
+```
+
+Press it from anywhere to instantly toggle the search window.
+
+---
+
+## 🏗️ System Architecture
+
+### 1️⃣ Application Startup
+
+When `main.py` runs:
+
+1. Ensures a local `models/` directory exists  
+2. Initializes the `SearchWindow`  
+3. Registers global hotkey (`Ctrl + K`)  
+4. Starts the Tkinter main event loop  
+5. Runs until manually closed  
+
+---
+
+### 2️⃣ Document Indexing Flow
+
+1. User selects a folder  
+2. Documents are read  
+3. Text is extracted  
+4. Content is chunked (if enabled)  
+5. Each chunk is converted into embeddings  
+6. Embeddings are stored in ChromaDB  
+
+---
+
+### 3️⃣ Search Flow
+
+1. User enters a natural language query  
+2. Query is converted into an embedding  
+3. ChromaDB performs similarity search  
+4. Top results are returned  
+5. User clicks a result to open the file  
+
+---
+
+## 🔒 Privacy & Security
+
+ODF follows strict privacy-first principles:
+
+- ✅ 100% Offline  
+- ✅ No cloud APIs  
+- ✅ No data collection  
+- ✅ No tracking  
+- ✅ No external servers  
+- ✅ No API keys required  
+
+Your files never leave your machine.
+
+---
+
+## ⚡ Features
+
+- 🔎 Semantic document search  
+- 🧠 AI-powered understanding  
+- 💾 Local vector storage (ChromaDB)  
+- ⚡ Global hotkey access  
+- 📂 Folder indexing  
+- 🖱️ Click-to-open results  
+- 🪶 Lightweight & fast  
+- 🔒 Fully offline  
+
+---
+
+## 📦 Installation Guide
+
+### Requirements
+
+- Python 3.10+  
+- Windows (recommended for global hotkey support)  
+
+---
+
+### 1️⃣ Clone the Repository
+
+```bash
+git clone https://github.com/ombhaltilak/Offline-Document-Finder-ODF-AI-Semantic-Search-Engine.git
+cd Offline-Document-Finder-ODF-AI-Semantic-Search-Engine
+```
+
+---
+
+### 2️⃣ Install Dependencies
+
 ```bash
 pip install -r requirements.txt
-
 ```
 
-
-3. **Run the App**:
-```bash
-python main.py
-
-```
-
-
-
-### How to Use
-
-1. **Toggle**: Press **Ctrl+K** anywhere to open the search bar.
-2. **Index**: Click the **"Index"** button and select a folder (e.g., `Documents/Work`). Watch the progress bar as it processes.
-3. **Search**: Type natural queries (e.g., *"How do I fix the server error?"*).
-4. **Open**: Click any result to open the file instantly.
+If hotkey registration fails, run your terminal as **Administrator**.
 
 ---
 
-*Powered by [LanceDB](https://lancedb.com/), [ONNX Runtime](https://onnxruntime.ai/), and [FastEmbed](https://qdrant.github.io/fastembed/).*
+### 3️⃣ Run the Application
+
+```bash
+python main.py
+```
+
+---
+
+## 📂 How To Use
+
+1. Start the application  
+2. Press **Ctrl + K**  
+3. Click **Index** and select your document folder  
+4. Wait for indexing to complete  
+5. Search using natural language  
+6. Click a result to open the file  
+
+---
+
+## 📁 Project Structure
+
+```
+Offline-Document-Finder/
+│
+├── main.py
+├── data/
+│   └── chroma_db/
+├── models/
+├── ui/
+│   └── search_window.py
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## 🧾 Git Ignore Rules
+
+The following are intentionally ignored:
+
+- `data/`
+- `*.sqlite3`
+- `models/`
+- `__pycache__/`
+- `venv/`
+
+These files are generated locally and should not be pushed to GitHub.
+
+---
+
+## 🛣️ Future Improvements
+
+- macOS & Linux hotkey support  
+- System tray integration  
+- Standalone executable build (.exe)  
+- Faster indexing pipeline  
+- Advanced ranking algorithm  
+- Background auto-sync  
+- File preview panel  
+
+---
+
+## 👨‍💻 Author
+
+**Om bhaltilak**  
+AI + Systems Engineering Project  
+
+---
+
+## 💡 Vision
+
+ODF aims to bring private, local AI search to everyday users — without relying on cloud infrastructure.
+
+> **Search Like You Think.**
