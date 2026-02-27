@@ -32,7 +32,7 @@ chroma_db/
 data_backup/
 models/
 TestFile/
-outputs/
+
 
 # Chroma / FAISS / Embedding Artifacts
 *.index
@@ -132,3 +132,5 @@ models/embeddings.index
 models/metadata.pkl
 RESUME_CONTENT.md
 archive.zip
+
+
