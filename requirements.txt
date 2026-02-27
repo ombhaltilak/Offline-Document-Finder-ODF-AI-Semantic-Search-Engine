@@ -1,0 +1,94 @@
+<<<<<<< HEAD
+# --- Core AI & Vector Storage ---
+# Primary vector database (Disk-based, Zero-Copy)
+lancedb>=0.4.0
+# Lightweight, hardware-aware embedding generation (Uses ONNX Runtime)
+fastembed>=0.3.1
+
+# --- Data Processing & Math ---
+# Pinned < 2.0.0 to ensure compatibility with Numba/ONNX libraries
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0
+
+# --- Document Ingestion ---
+# Extract text from PDFs
+pdfminer.six>=20231228
+# Extract text from DOCX files
+python-docx>=1.1.2
+
+# --- User Interface (GUI) ---
+customtkinter>=5.2.2
+# Image handling for UI icons/previews
+Pillow>=10.3.0
+# Standard Tkinter wrapper (usually built-in, but good to ensure environment checks)
+tk-tools>=0.1.0
+
+# --- System Utilities ---
+# For global hotkey detection (Ctrl+K)
+keyboard>=0.13.5
+# Progress bars for file indexing
+tqdm>=4.66.4
+# HTTP requests for downloading models
+requests>=2.31.0
+
+# --- Search & Ranking ---
+# BM25 library for optional lexical search support
+rank-bm25>=0.2.2
+=======
+# ==========================================================
+# CORE NUMERICAL (Critical Fix for Chroma / ONNX)
+# ==========================================================
+numpy==1.26.4
+scipy==1.13.1
+
+# ==========================================================
+# GUI (Frontend)
+# ==========================================================
+customtkinter==5.2.2
+pillow==10.4.0
+tk-tools==0.16.0 ; platform_system=="Windows"
+
+# ==========================================================
+# VECTOR DATABASE
+# ==========================================================
+chromadb==1.4.1
+
+# ==========================================================
+# EMBEDDINGS (GPU ENABLED)
+# ==========================================================
+fastembed==0.7.4
+onnxruntime-gpu==1.19.2
+
+# ==========================================================
+# FILE PROCESSING
+# ==========================================================
+python-docx==1.2.0
+PyMuPDF==1.26.5
+openpyxl==3.1.5
+pypdf==6.6.0
+
+# ==========================================================
+# SYSTEM UTILITIES
+# ==========================================================
+tqdm==4.67.1
+keyboard==0.13.5
+requests==2.32.5
+click==8.1.8
+python-dotenv==1.2.1
+loguru==0.7.3
+
+# ==========================================================
+# OPTIONAL REPORT GENERATION
+# ==========================================================
+Markdown==3.9
+xhtml2pdf==0.2.17
+reportlab==4.4.9
+
+# ==========================================================
+# EVALUATION & VISUALIZATION
+# ==========================================================
+scikit-learn==1.6.1
+matplotlib==3.9.4
+seaborn==0.13.2
+pandas==2.3.3
+>>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
