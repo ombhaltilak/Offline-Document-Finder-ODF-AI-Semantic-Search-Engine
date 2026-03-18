@@ -1,73 +1,34 @@
-<<<<<<< HEAD
-=======
-"""
-Offline Document Finder - Main UI
-
-This module:
-- Builds the CustomTkinter GUI
-- Handles user search interactions
-- Connects indexing system with vector search
-- Displays ranked results with preview and similarity score
-- Manages indexing progress and database reset
-"""
-
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
 import hashlib
-import customtkinter as ctk
-import tkinter as tk
-from tkinter import filedialog, messagebox
-import threading
 import os
 import sys
+import threading
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import customtkinter as ctk
 from PIL import Image
 
-# Backend imports
 from search_engine.vector_search import VectorSearch
 from search_engine.file_indexer import FileIndexer
 from utils.open_file import open_file
 
-
-# ---------------------------------------------------------
-# THEME CONFIGURATION (Dark Modern UI)
-# ---------------------------------------------------------
+# -------------------- THEME -------------------- 
 THEME = {
-<<<<<<< HEAD
-    "bg": "#0d0d0d",           # Ultra Dark
-    "card": "#1a1a1a",         # Slightly lighter for contrast
-    "card_hover": "#252525",   # Hover Grey
-    "border": "#444444",       # Light Border for visibility
-    "accent": "#3B8ED0",       # Electric Blue
-=======
-    "bg": "#0d0d0d",           # Ultra Dark Background
-    "card": "#1a1a1a",         # Card Background
-    "card_hover": "#252525",   # Hover Effect
-    "border": "#444444",       # Card Border
-    "accent": "#3B8ED0",       # Primary Accent Color
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+    "bg": "#0d0d0d",           # Ultra Dark 
+    "card": "#1a1a1a",         # Slightly lighter for contrast 
+    "card_hover": "#252525",   # Hover Grey 
+    "border": "#444444",       # Light Border for visibility 
+    "accent": "#3B8ED0",       # Electric Blue 
     "text_primary": "#FFFFFF",
     "text_secondary": "#808080",
-    "danger": "#C42B1C"        # Danger / Reset Button Color
+    "danger": "#C42B1C"
 }
 
-# Force Dark Mode
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 
-<<<<<<< HEAD
-# -------------------- CUSTOM WIDGETS --------------------
+# -------------------- CUSTOM WIDGETS -------------------- 
 class CircularProgress(tk.Canvas):
-=======
-# ---------------------------------------------------------
-# CUSTOM CIRCULAR PROGRESS WIDGET
-# ---------------------------------------------------------
-class CircularProgress(tk.Canvas):
-    """
-    Custom circular progress indicator.
-    Used during folder indexing.
-    """
-
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
     def __init__(self, master, size=45, bg_color=THEME["bg"],
                  fg_color=THEME["accent"], track_color="#333333"):
         super().__init__(
@@ -77,59 +38,30 @@ class CircularProgress(tk.Canvas):
             bg=bg_color,
             highlightthickness=0
         )
-<<<<<<< HEAD
-=======
-
-        # Visual configuration
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
         self.size = size
         self.fg_color = fg_color
         self.track_color = track_color
         self.percentage = 0
-<<<<<<< HEAD
         self.center = size / 2
         self.radius = (size - 8) / 2
         self.stroke_width = 5
         self.draw()
 
     def set(self, value):
-=======
-
-        # Geometry helpers
-        self.center = size / 2
-        self.radius = (size - 8) / 2
-        self.stroke_width = 5
-
-        self.draw()
-
-    def set(self, value):
-        """Update progress value (0.0 to 1.0)."""
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
         self.percentage = max(0.0, min(value, 1.0))
         self.draw()
 
     def draw(self):
-<<<<<<< HEAD
         self.delete("all")
 
-        # Background Track
-=======
-        """Redraw circular progress."""
-        self.delete("all")
-
-        # Background track
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+        # Background Track 
         self.create_oval(
             self.center - self.radius, self.center - self.radius,
             self.center + self.radius, self.center + self.radius,
             outline="#2b2b2b", width=self.stroke_width
         )
 
-<<<<<<< HEAD
-        # Progress Arc
-=======
-        # Foreground progress arc
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+        # Progress Arc 
         if self.percentage >= 1.0:
             self.create_oval(
                 self.center - self.radius, self.center - self.radius,
@@ -145,11 +77,7 @@ class CircularProgress(tk.Canvas):
                 outline="#3B8ED0", width=self.stroke_width
             )
 
-<<<<<<< HEAD
-        # Percentage Text
-=======
-        # Percentage text
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+        # Percentage Text 
         text_content = f"{int(self.percentage * 100)}%"
         self.create_text(
             self.center, self.center,
@@ -158,50 +86,20 @@ class CircularProgress(tk.Canvas):
         )
 
 
-<<<<<<< HEAD
-# -------------------- MAIN WINDOW --------------------
-=======
-# ---------------------------------------------------------
-# MAIN APPLICATION WINDOW
-# ---------------------------------------------------------
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+# -------------------- MAIN WINDOW -------------------- 
 class SearchWindow:
-    """
-    Main application window for Offline Document Finder.
-
-    Responsibilities:
-    - Manage UI lifecycle
-    - Trigger search queries
-    - Display ranked results
-    - Handle indexing operations
-    - Manage database reset
-    """
-
     WIDTH = 800
     INITIAL_HEIGHT = 160
     MAX_HEIGHT = 700
 
     def __init__(self):
         self.root = None
-
-        # Backend systems
         self.vector_search = VectorSearch()
         self.file_indexer = FileIndexer()
-<<<<<<< HEAD
         self.results = []
         self.selected_index = -1
 
-    # -------------------- WINDOW LOGIC --------------------
-=======
-
-        # Search state
-        self.results = []
-        self.selected_index = -1
-
-    # ---------------------------------------------------------
-    # WINDOW VISIBILITY LOGIC
-    # ---------------------------------------------------------
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+    # -------------------- WINDOW LOGIC -------------------- 
     def toggle_window(self):
         if not self.root:
             self.show_window()
@@ -211,7 +109,6 @@ class SearchWindow:
             self.root.withdraw()
 
     def show_window(self):
-        """Show or restore main window."""
         if not self.root:
             self._create_window()
         else:
@@ -219,15 +116,9 @@ class SearchWindow:
             self.root.lift()
             self.root.focus_force()
             self.search_entry.focus_set()
-<<<<<<< HEAD
-=======
-
-        # Check if DB is empty after showing window
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
         self.root.after(400, self._check_empty_db)
 
     def _create_window(self):
-        """Initialize and build UI layout."""
         self.root = ctk.CTk()
         self.root.overrideredirect(False)
         self.root.title("Offline Document Finder")
@@ -236,7 +127,6 @@ class SearchWindow:
         self.root.resizable(True, True)
         self._center()
 
-        # Main container
         self.main = ctk.CTkFrame(
             self.root,
             corner_radius=0,
@@ -249,40 +139,33 @@ class SearchWindow:
         self._build_results()
         self._build_footer()
         self._bind_keys()
-<<<<<<< HEAD
-        self.root.protocol("WM_DELETE_WINDOW", self.root.withdraw)
-=======
 
-        # Fully close app on window close
+        # --- IMPORTANT CHANGE: Fully close the app on exit --- 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _on_close(self):
-        """
-        Forcefully terminate application.
-        Ensures background threads are stopped.
+        """ 
+        Handles the window close event. 
+        Destroys the window and forces the python process to exit. 
         """
         try:
             if self.root:
-                self.root.quit()
-                self.root.destroy()
+                self.root.quit()    # Stops the main loop 
+                self.root.destroy()  # Destroys the UI 
         except Exception as e:
             print(f"Error closing: {e}")
 
+        # Force kill the process to stop any background threads immediately 
         os._exit(0)
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
 
     def _center(self):
-        """Center window on screen."""
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         x = (sw - self.WIDTH) // 2
         y = sh // 4
         self.root.geometry(f"{self.WIDTH}x{self.INITIAL_HEIGHT}+{x}+{y}")
 
-    # ---------------------------------------------------------
-    # SEARCH BAR UI
-    # ---------------------------------------------------------
+    # -------------------- SEARCH BAR -------------------- 
     def _build_search_bar(self):
-        """Create search input bar and button."""
         bar = ctk.CTkFrame(self.main, fg_color="transparent")
         bar.pack(fill="x", padx=20, pady=(20, 10))
 
@@ -304,11 +187,7 @@ class SearchWindow:
         self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.search_entry.focus()
 
-<<<<<<< HEAD
-        # --- NEW: Submit Button ---
-=======
-        # Manual search trigger button
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+        # --- NEW: Submit Button --- 
         self.btn_search = ctk.CTkButton(
             bar,
             text="Search",
@@ -320,46 +199,23 @@ class SearchWindow:
         )
         self.btn_search.pack(side="left")
 
-<<<<<<< HEAD
-    # -------------------- SEARCH TRIGGER --------------------
+    # -------------------- SEARCH TRIGGER -------------------- 
     def _on_search_click(self):
-=======
-    # ---------------------------------------------------------
-    # SEARCH LOGIC
-    # ---------------------------------------------------------
-    def _on_search_click(self):
-        """Validate and trigger search."""
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
         q = self.query.get().strip()
         if not q:
             self.status.configure(text="Please enter a search term.")
             return
         self._search(q)
 
-<<<<<<< HEAD
-    # -------------------- SEARCH EXECUTION --------------------
+    # -------------------- SEARCH EXECUTION -------------------- 
     def _search(self, query):
-        def task():
-            # Limit results to top 10
-            res = self.vector_search.search(query, top_k=10)
-            self.root.after(0, lambda: self._render_results(res))
-        threading.Thread(target=task, daemon=True).start()
-
-    # -------------------- RENDER RESULTS --------------------
-=======
-    def _search(self, query):
-        """
-        Execute semantic search in background thread.
-        - Fetches top 50 chunks
-        - Deduplicates by filename
-        - Displays top 10 unique files
-        """
         self.status.configure(text="Searching...")
 
         def task():
+            # 1. Fetch more results than needed (e.g., 50) to allow for filtering 
             raw_results = self.vector_search.search(query, top_k=50)
 
-            # Deduplicate by filename
+            # 2. De-duplicate: Keep only the best scoring chunk for each file 
             unique_results = []
             seen_files = set()
 
@@ -369,18 +225,15 @@ class SearchWindow:
                     unique_results.append(res)
                     seen_files.add(fname)
 
+            # 3. Slice to get the top 10 UNIQUE files 
             final_results = unique_results[:10]
 
             self.root.after(0, lambda: self._render_results(final_results))
 
         threading.Thread(target=task, daemon=True).start()
 
-    # ---------------------------------------------------------
-    # RESULTS DISPLAY
-    # ---------------------------------------------------------
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+    # -------------------- RENDER RESULTS -------------------- 
     def _build_results(self):
-        """Initialize result container."""
         self.separator = ctk.CTkFrame(self.main, height=1, fg_color=THEME["border"])
         self.results_view = ctk.CTkScrollableFrame(
             self.main,
@@ -388,7 +241,6 @@ class SearchWindow:
             corner_radius=0
         )
 
-<<<<<<< HEAD
     def _show_results(self):
         self.separator.pack(fill="x", padx=20, pady=10)
         self.results_view.pack(fill="both", expand=True, padx=20, pady=(0, 20))
@@ -399,10 +251,7 @@ class SearchWindow:
         if self.root.state() != 'zoomed':
             self._animate_height(self.INITIAL_HEIGHT)
 
-=======
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
     def _render_results(self, results):
-        """Render result cards."""
         for w in self.results_view.winfo_children():
             w.destroy()
         self.results = results
@@ -414,22 +263,16 @@ class SearchWindow:
             return
 
         self._show_results()
-<<<<<<< HEAD
-        for i, r in enumerate(results[:10]):  # show only first 10
-=======
-
-        for i, r in enumerate(results[:10]):
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+        for i, r in enumerate(results[:10]):  # show only first 10 
             self._create_card(i, r)
 
         if self.root.state() != 'zoomed':
             height = min(self.MAX_HEIGHT, self.INITIAL_HEIGHT + len(results[:10]) * 85)
             self._animate_height(height)
-<<<<<<< HEAD
 
         self.status.configure(text=f"Showing {len(results[:10])} results")
 
-    # -------------------- RESULT CARD --------------------
+    # -------------------- RESULT CARD -------------------- 
     def _create_card(self, index, res):
         frame = ctk.CTkFrame(
             self.results_view,
@@ -447,7 +290,7 @@ class SearchWindow:
         elif ext == ".docx":
             icon = "📘"
         elif ext == ".txt":
-            icon = "📝"
+            icon = "📄"
 
         ctk.CTkLabel(frame, text=icon, font=("Segoe UI", 22)).pack(side="left", padx=12)
 
@@ -486,18 +329,20 @@ class SearchWindow:
             width=48
         ).pack(side="right", padx=12)
 
-        # Bindings
+        # Bindings 
         frame.bind("<Enter>", lambda e: frame.configure(fg_color=THEME["card_hover"], border_color=THEME["accent"]))
         frame.bind("<Leave>", lambda e: frame.configure(fg_color=THEME["card"], border_color=THEME["border"]))
+        
         click_handler = lambda e: open_file(res.get("file_path", ""))
         frame.bind("<Button-1>", click_handler)
+        
         for child in frame.winfo_children():
             if not isinstance(child, ctk.CTkButton):
                 child.bind("<Button-1>", click_handler)
         for child in body.winfo_children():
             child.bind("<Button-1>", click_handler)
 
-    # -------------------- FOOTER --------------------
+    # -------------------- FOOTER -------------------- 
     def _build_footer(self):
         self.footer = ctk.CTkFrame(self.main, fg_color="transparent")
         self.footer.pack(fill="x", padx=20, pady=(0, 20), side="bottom")
@@ -516,20 +361,37 @@ class SearchWindow:
             bg_color=THEME["bg"]
         )
 
+        # --- UPDATED: Button Container for Right Alignment --- 
+        btn_container = ctk.CTkFrame(self.footer, fg_color="transparent")
+        btn_container.pack(side="right", padx=0, pady=5)
+
+        # --- NEW: Reset Index Button (Red) --- 
+        self.btn_reset = ctk.CTkButton(
+            btn_container,
+            text=" Reset Index",
+            command=self._on_reset_click,
+            fg_color=THEME["danger"],
+            hover_color="#8B0000",
+            width=100,
+            height=30
+        )
+        self.btn_reset.pack(side="left", padx=(0, 10))
+
+        # Existing Index Folder Button 
         self.btn_index = ctk.CTkButton(
-            self.footer,
-            text="📁 Index Folder",
+            btn_container,
+            text=" Index Folder",
             command=self._browse_folder,
             fg_color="#2a2a2a",
             width=120,
             height=30
         )
-        self.btn_index.pack(side="right", padx=0, pady=5)
+        self.btn_index.pack(side="left")
 
-    # -------------------- KEYBOARD NAV --------------------
+    # -------------------- KEYBOARD NAV -------------------- 
     def _bind_keys(self):
-        self.root.bind("<Escape>", lambda e: self.root.withdraw())
-        self.root.bind("<Return>", lambda e: self._on_search_click())  # NEW: Enter triggers Search
+        self.root.bind("<Escape>", lambda e: self._on_close())
+        self.root.bind("<Return>", lambda e: self._on_search_click())  # NEW: Enter triggers Search 
         self.root.bind("<Down>", self._select_next)
         self.root.bind("<Up>", self._select_prev)
 
@@ -552,7 +414,7 @@ class SearchWindow:
         if 0 <= self.selected_index < len(self.results):
             open_file(self.results[self.selected_index]["file_path"])
 
-    # -------------------- ANIMATION --------------------
+    # -------------------- ANIMATION -------------------- 
     def _animate_height(self, target):
         if self.root.state() == 'zoomed':
             return
@@ -567,21 +429,11 @@ class SearchWindow:
                 self.root.after(5, run)
         run()
 
-    # -------------------- INDEXING --------------------
-=======
-
-        self.status.configure(text=f"Showing {len(results[:10])} results")
-
-    # ---------------------------------------------------------
-    # INDEXING SYSTEM
-    # ---------------------------------------------------------
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
+    # -------------------- INDEXING -------------------- 
     def _browse_folder(self):
-        """Prompt user to select folder for indexing."""
         folder = filedialog.askdirectory()
         if not folder:
             return
-<<<<<<< HEAD
         self.status.pack_forget()
         self.progress_donut.pack(side="left", padx=10)
         self.progress_donut.set(0)
@@ -651,86 +503,30 @@ class SearchWindow:
         self.status.pack(side="left", pady=5)
 
     def _check_empty_db(self):
-=======
-
-        self.status.pack_forget()
-        self.progress_donut.pack(side="left", padx=10)
-        self.progress_donut.set(0)
-
-        threading.Thread(target=self._index_thread, args=(folder,), daemon=True).start()
-
-    def _index_thread(self, folder):
-        """
-        Background indexing process:
-        - Scan files
-        - Skip unchanged files
-        - Embed and store new documents
-        - Update circular progress UI
-        """
->>>>>>> 2798949 (Initial commit - ODF AI Semantic Search Engine)
         try:
-            files = self.file_indexer.scan_directory(folder)
-            total = len(files)
+            if self.vector_search.get_stats()["count"] == 0:
+                if messagebox.askyesno("Welcome", "No documents indexed. Index now?"):
+                    self._browse_folder()
+        except:
+            pass
 
-            if total == 0:
-                self.root.after(0, lambda: self.status.configure(text="No supported files found."))
-                self.root.after(1500, self._reset_footer)
-                return
-
-            existing_ids = self.vector_search.get_all_ids()
-            new_files = []
-            skipped_count = 0
-
-            self.root.after(0, lambda: self.status.configure(text="Checking file status..."))
-
-            for f in files:
-                try:
-                    stats = os.stat(f)
-                    doc_id = hashlib.md5(f"{f}_{stats.st_mtime}".encode()).hexdigest()
-
-                    if doc_id in existing_ids:
-                        skipped_count += 1
-                    else:
-                        new_files.append(f)
-
-                except Exception:
-                    new_files.append(f)
-
-            if not new_files:
-                self.root.after(0, lambda: self.status.configure(text="All files up to date."))
-                self.root.after(1500, self._reset_footer)
-                return
-
-            gen = self.file_indexer.process_files(new_files, existing_ids=existing_ids)
-            self.vector_search.add_documents(gen)
-
-            self.root.after(0, lambda: self.status.configure(text=f"Indexed {len(new_files)} new files."))
-
-        except Exception as e:
-            print(f"Indexing error: {e}")
-            self.root.after(0, lambda: self.status.configure(text="Error during indexing."))
-        finally:
-            self.root.after(2000, self._reset_footer)
-
-    # ---------------------------------------------------------
-    # DATABASE RESET
-    # ---------------------------------------------------------
+    # --- NEW: Handler for Resetting Index --- 
     def _on_reset_click(self):
+        """ 
+        Deletes all indexed data after confirmation. 
         """
-        Delete all indexed documents after confirmation.
-        Calls backend clear_database().
-        """
-        if messagebox.askyesno("Reset Index", "Are you sure you want to delete all indexed documents?\nThis action cannot be undone."):
+        msg = "Are you sure you want to delete all indexed documents?\nThis action cannot be undone."
+        if messagebox.askyesno("Reset Index", msg):
             try:
+                # 1. Clear UI Results 
                 for w in self.results_view.winfo_children():
                     w.destroy()
-
                 self.results = []
                 self.status.configure(text="Clearing database...")
 
+                # 2. Call Backend 
                 if hasattr(self.vector_search, 'clear_database'):
                     success = self.vector_search.clear_database()
-
                     if success:
                         self.status.configure(text="Database cleared.")
                         messagebox.showinfo("Success", "All indexed documents have been removed.")
@@ -738,8 +534,8 @@ class SearchWindow:
                         self.status.configure(text="Error clearing DB.")
                         messagebox.showerror("Error", "Failed to clear database.")
                 else:
-                    messagebox.showerror("Error", "Backend is outdated. Add clear_database().")
-
+                    msg_err = "Your backend is outdated.\nPlease add 'clear_database()' to vector_search.py."
+                    messagebox.showerror("Error", msg_err)
             except Exception as e:
                 print(f"Error resetting: {e}")
-                messagebox.showerror("Error", f"Unexpected error: {e}")
+                messagebox.showerror("Error", f"An unexpected error occurred: {e}")
